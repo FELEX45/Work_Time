@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#121212">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Табель">
+<title>Табель</title>
+<style>
+:root{
+  --bg:#121212;--card:#1e1e1e;--border:#2c2c2e;--text:#f2f2f7;--muted:#8e8e93;
+  --red:#ff453a;--green:#30d158;--blue:#0a84ff;
+  --top:env(safe-area-inset-top,0px);--bottom:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);
+  font:16px/1.3 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif}
+body{padding:calc(var(--top) + 8px) 12px calc(88px + var(--bottom));max-width:560px;margin:0 auto;
+  -webkit-user-select:none;user-select:none}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+input,select{font:inherit;font-size:16px;color:var(--text);background:var(--bg);
+  border:1px solid var(--border);border-radius:10px;padding:10px;width:100%;min-width:0;-webkit-user-select:text;user-select:text}
+
+/* Верхняя панель */
+.header{display:flex;align-items:center;justify-content:space-between;padding:6px 2px 12px}
+.header h1{font-size:22px;margin:0;font-weight:700;text-transform:capitalize}
+.arrow{width:40px;height:40px;border-radius:20px;background:var(--card);color:var(--red);font-size:22px}
+
+/* Сетка календаря */
+.weekdays,.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.weekdays div{text-align:center;color:var(--muted);font-size:12px;padding-bottom:4px}
+.weekdays div:nth-child(n+6){color:var(--red)}
+.cell{aspect-ratio:1/1.25;background:var(--card);border:1px solid var(--border);border-radius:10px;
+  padding:4px 2px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;overflow:hidden}
+.cell.empty{background:none;border-color:transparent}
+.cell .num{font-size:13px;font-weight:600}
+.cell.today .num{background:var(--red);border-radius:10px;padding:0 6px}
+.cell .hours{font-size:11px;color:var(--blue);font-weight:600;margin-top:2px}
+.cell .money{font-size:11px;color:var(--green);font-weight:600}
+
+/* Статистика */
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;margin-top:12px}
+.stats{display:grid;grid-template-columns:1fr 1fr}
+.stat{padding:12px 14px}
+.stat span{display:block;color:var(--muted);font-size:12px}
+.stat b{font-size:19px}
+.stat b.money{color:var(--green)}
+details summary{padding:14px;font-weight:600;list-style:none;display:flex;justify-content:space-between}
+details summary::after{content:"›";color:var(--muted);transition:transform .2s}
+details[open] summary::after{transform:rotate(90deg)}
+summary::-webkit-details-marker{display:none}
+.tariff-row{display:flex;justify-content:space-between;padding:10px 14px;border-top:1px solid var(--border);font-size:15px}
+.tariff-row .money{color:var(--green)}
+
+/* Нижняя панель */
+.actions{position:fixed;left:0;right:0;bottom:0;display:flex;gap:10px;justify-content:center;
+  padding:10px 12px calc(10px + var(--bottom));background:linear-gradient(transparent,var(--bg) 35%)}
+.actions button{flex:1;max-width:270px;height:52px;border-radius:26px;font-weight:700;letter-spacing:.5px}
+.btn-primary{background:var(--red)}.btn-secondary{background:var(--card);border:1px solid var(--border)}
+
+/* Модальные окна */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-end;justify-content:center;z-index:10}
+.overlay.open{display:flex}
+.sheet{width:100%;max-width:560px;max-height:90vh;overflow-y:auto;background:var(--card);
+  border-radius:20px 20px 0 0;padding:16px 16px calc(16px + var(--bottom));animation:rise .22s ease-out}
+@keyframes rise{from{transform:translateY(40px);opacity:0}}
+@media (prefers-reduced-motion:reduce){.sheet{animation:none}}
+.sheet h2{margin:0 0 12px;font-size:19px}
+.row{display:flex;gap:10px;margin-bottom:12px;align-items:center}
+.row label{flex:1;color:var(--muted);font-size:13px}
+.row label input,.row label select{margin-top:4px}
+.check{display:flex;align-items:center;gap:10px;font-size:16px}
+.check input{width:24px;height:24px;accent-color:var(--red);padding:0}
+.colors{display:flex;gap:12px;margin:6px 0 12px}
+.dot{width:34px;height:34px;border-radius:17px;border:3px solid transparent}
+.dot.selected{border-color:#fff}
+.preview{color:var(--green);font-weight:600;margin:4px 0 12px;min-height:20px}
+.buttons{display:flex;gap:10px;margin-top:8px}
+.buttons button{flex:1;height:48px;border-radius:14px;font-weight:600;background:var(--border)}
+.buttons .save{background:var(--red)}
+.buttons .danger{color:var(--red)}
+.report-row{display:flex;justify-content:space-between;gap:8px;padding:9px 0;border-bottom:1px solid var(--border);font-size:14px}
+.report-row small{color:var(--muted);display:block}
+.empty-note{color:var(--muted);padding:16px 0;text-align:center}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <button class="arrow" id="previousMonthButton" aria-label="Предыдущий месяц">‹</button>
+  <h1 id="monthTitle"></h1>
+  <button class="arrow" id="nextMonthButton" aria-label="Следующий месяц">›</button>
+</div>
+
+<div class="weekdays"><div>Пн</div><div>Вт</div><div>Ср</div><div>Чт</div><div>Пт</div><div>Сб</div><div>Вс</div></div>
+<div class="grid" id="calendarGrid"></div>
+
+<div class="card stats">
+  <div class="stat"><span>Дней отработано</span><b id="statDays">0</b></div>
+  <div class="stat"><span>Часов за месяц</span><b id="statHours">0:00</b></div>
+  <div class="stat"><span>Доход за месяц</span><b class="money" id="statMonthIncome">0,00</b></div>
+  <div class="stat"><span>Доход за год</span><b class="money" id="statYearIncome">0,00</b></div>
+</div>
+
+<div class="card">
+  <details>
+    <summary>Детализация по тарифам</summary>
+    <div id="tariffBreakdown"></div>
+  </details>
+</div>
+
+<div class="actions">
+  <button class="btn-secondary" id="reportButton">ОТЧЕТ</button>
+  <button class="btn-primary" id="exportButton">ЭКСПОРТ</button>
+</div>
+
+<!-- Окно ввода смены -->
+<div class="overlay" id="dayOverlay">
+  <div class="sheet">
+    <h2 id="dayTitle"></h2>
+    <div class="row">
+      <label>Начало<input type="time" id="startInput"></label>
+      <label>Конец<input type="time" id="endInput"></label>
+    </div>
+    <div class="row">
+      <label class="check"><input type="checkbox" id="breakCheckbox"> Был перерыв</label>
+      <select id="breakSelect" style="display:none;flex:1">
+        <option value="15">15 мин</option><option value="30">30 мин</option>
+        <option value="45">45 мин</option><option value="60">1 час</option>
+      </select>
+    </div>
+    <div class="row"><label>Комментарий<input type="text" id="commentInput" placeholder="база, шоурум…"></label></div>
+    <div class="row"><label>Своя ставка, р/ч (необязательно)
+      <input type="text" inputmode="decimal" id="customRateInput" placeholder="пусто — авторасчет по тарифам"></label></div>
+    <div class="preview" id="dayPreview"></div>
+    <div class="buttons">
+      <button class="danger" id="deleteButton">Удалить</button>
+      <button id="cancelButton">Отмена</button>
+      <button class="save" id="saveButton">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- Окно отчета -->
+<div class="overlay" id="reportOverlay">
+  <div class="sheet">
+    <h2 id="reportTitle">Отчет</h2>
+    <div id="reportBody"></div>
+    <div class="buttons"><button id="reportCloseButton">Закрыть</button></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ===================== Настройки ===================== */
+const TARIFF_NAMES = ["Основной тариф", "Тариф 2", "Тариф 3"];
+const TARIFF_RATES = [15, 18, 21];                 // рублей в час
+const DAY_COLORS = ["", "#ff453a", "#ff9f0a", "#30d158", "#0a84ff", "#bf5af2"]; // "" = без заливки
+const STORAGE_KEY = "timesheet.v1";
+const MINUTES_IN_DAY = 24 * 60;
+
+/* Границы суток в минутах от полуночи */
+const MORNING_START = 8 * 60;    // 08:00
+const EVENING_START = 17 * 60;   // 17:00
+const NIGHT_START = 23 * 60;     // 23:00
+
+/* ===================== Состояние ===================== */
+let storedShifts = loadShifts();
+let visibleYear = new Date().getFullYear();
+let visibleMonth = new Date().getMonth();
+let selectedDateKey = null;
+let selectedColorIndex = 0;
+
+/* ===================== Хранилище ===================== */
+function loadShifts() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+  catch (error) { return {}; }
+}
+function saveShifts() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(storedShifts)); }
+  catch (error) { alert("Не удалось сохранить данные: память браузера недоступна."); }
+}
+
+/* ===================== Вспомогательные функции ===================== */
+function pad(value) { return String(value).padStart(2, "0"); }
+function makeDateKey(year, month, day) { return year + "-" + pad(month + 1) + "-" + pad(day); }
+function parseDateKey(key) { const [y, m, d] = key.split("-").map(Number); return new Date(y, m - 1, d); }
+function timeToMinutes(text) { const [h, m] = text.split(":").map(Number); return h * 60 + m; }
+function formatMoney(value) { return value.toFixed(2).replace(".", ","); }
+function formatHoursMinutes(hours) {
+  const totalMinutes = Math.round(hours * 60);
+  return Math.floor(totalMinutes / 60) + ":" + pad(totalMinutes % 60);
+}
+function formatDecimalHours(hours) { return (Math.round(hours * 100) / 100).toFixed(2).replace(".", ","); }
+function isWeekend(date) { return date.getDay() === 0 || date.getDay() === 6; }
+
+/* Номер тарифа по минуте суток (0..1439) для будней */
+function tariffIndexForMinute(minuteOfDay) {
+  if (minuteOfDay >= MORNING_START && minuteOfDay < EVENING_START) return 0;
+  if (minuteOfDay >= EVENING_START && minuteOfDay < NIGHT_START) return 1;
+  return 2; // с 23:00 до 08:00
+}
+
+/* ===================== Расчет смены ===================== */
+/* Возвращает { hoursByTariff:[h0,h1,h2], totalHours, earnings } или null, если данных недостаточно */
+function calculateShift(shift, date) {
+  if (!shift || !shift.start || !shift.end) return null;
+  const startMinutes = timeToMinutes(shift.start);
+  let endMinutes = timeToMinutes(shift.end);
+  if (isNaN(startMinutes) || isNaN(endMinutes)) return null;
+  if (endMinutes <= startMinutes) endMinutes += MINUTES_IN_DAY;   // ночная смена через полночь
+
+  const grossMinutes = endMinutes - startMinutes;
+  const breakMinutes = shift.breakOn ? Number(shift.breakMinutes) || 0 : 0;
+  const netMinutes = Math.max(0, grossMinutes - breakMinutes);
+  const minutesByTariff = [0, 0, 0];
+
+  // Своя ставка: все чистые часы считаются по введенной вручную цене
+  const customRate = parseFloat(String(shift.customRate || "").replace(",", "."));
+  const hasCustomRate = isFinite(customRate) && customRate > 0;
+  let customMinutes = 0;
+  if (hasCustomRate) {
+    customMinutes = netMinutes;                                   // правило A
+  } else if (isWeekend(date)) {
+    minutesByTariff[2] = netMinutes;                              // правило B
+  } else {
+    // Правило C: считаем минуты брутто по интервалам, затем пропорционально вычитаем обед
+    const grossByTariff = [0, 0, 0];
+    for (let minute = startMinutes; minute < endMinutes; minute++) {
+      grossByTariff[tariffIndexForMinute(minute % MINUTES_IN_DAY)]++;
+    }
+    const ratio = grossMinutes > 0 ? netMinutes / grossMinutes : 0;
+    for (let i = 0; i < 3; i++) minutesByTariff[i] = grossByTariff[i] * ratio;
+  }
+
+  const hoursByTariff = minutesByTariff.map(minutes => minutes / 60);
+  const customHours = customMinutes / 60;
+  const earnings = hoursByTariff.reduce((sum, hours, i) => sum + hours * TARIFF_RATES[i], 0) +
+    (hasCustomRate ? customHours * customRate : 0);
+  return { hoursByTariff, customHours, customRate: hasCustomRate ? customRate : 0, totalHours: netMinutes / 60, earnings };
+}
+
+/* Все рассчитанные смены в указанном префиксе ("2026-11" или "2026") */
+function collectShifts(prefix) {
+  const result = [];
+  Object.keys(storedShifts).sort().forEach(key => {
+    if (key.indexOf(prefix) !== 0) return;
+    const date = parseDateKey(key);
+    const calculation = calculateShift(storedShifts[key], date);
+    if (calculation) result.push({ key, date, shift: storedShifts[key], calculation });
+  });
+  return result;
+}
+
+/* ===================== Отрисовка календаря ===================== */
+function render() {
+  const monthName = new Date(visibleYear, visibleMonth, 1).toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
+  document.getElementById("monthTitle").textContent = monthName;
+
+  const grid = document.getElementById("calendarGrid");
+  grid.innerHTML = "";
+  const firstWeekday = (new Date(visibleYear, visibleMonth, 1).getDay() + 6) % 7; // Пн = 0
+  const daysInMonth = new Date(visibleYear, visibleMonth + 1, 0).getDate();
+  const todayKey = makeDateKey(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+
+  for (let i = 0; i < firstWeekday; i++) grid.insertAdjacentHTML("beforeend", '<div class="cell empty"></div>');
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const key = makeDateKey(visibleYear, visibleMonth, day);
+    const shift = storedShifts[key];
+    const calculation = calculateShift(shift, new Date(visibleYear, visibleMonth, day));
+    const cell = document.createElement("button");
+    cell.className = "cell" + (key === todayKey ? " today" : "");
+    cell.innerHTML = '<span class="num">' + day + "</span>";
+    if (calculation) {
+      cell.insertAdjacentHTML("beforeend",
+        '<span class="hours">' + formatHoursMinutes(calculation.totalHours) + "</span>" +
+        '<span class="money">' + Math.round(calculation.earnings) + "</span>");
+      if (shift.color) {
+        cell.style.background = shift.color + "40";
+        cell.style.borderColor = shift.color;
+      }
+    }
+    cell.addEventListener("click", () => openDayEditor(key));
+    grid.appendChild(cell);
+  }
+  renderStatistics();
+}
+
+function renderStatistics() {
+  const monthPrefix = visibleYear + "-" + pad(visibleMonth + 1);
+  const monthShifts = collectShifts(monthPrefix);
+  const yearShifts = collectShifts(String(visibleYear));
+  const hoursByTariff = [0, 0, 0];
+  let totalHours = 0, monthIncome = 0, customHours = 0, customIncome = 0;
+
+  monthShifts.forEach(item => {
+    totalHours += item.calculation.totalHours;
+    monthIncome += item.calculation.earnings;
+    item.calculation.hoursByTariff.forEach((hours, i) => hoursByTariff[i] += hours);
+    customHours += item.calculation.customHours;
+    customIncome += item.calculation.customHours * item.calculation.customRate;
+  });
+  const yearIncome = yearShifts.reduce((sum, item) => sum + item.calculation.earnings, 0);
+
+  document.getElementById("statDays").textContent = monthShifts.length;
+  document.getElementById("statHours").textContent = formatHoursMinutes(totalHours);
+  document.getElementById("statMonthIncome").textContent = formatMoney(monthIncome);
+  document.getElementById("statYearIncome").textContent = formatMoney(yearIncome);
+
+  document.getElementById("tariffBreakdown").innerHTML = TARIFF_NAMES.map((name, i) =>
+    '<div class="tariff-row"><span>' + name + " (" + TARIFF_RATES[i] + " р/ч)</span><span>" +
+    formatHoursMinutes(hoursByTariff[i]) + ' · <b class="money">' + formatMoney(hoursByTariff[i] * TARIFF_RATES[i]) + "</b></span></div>"
+  ).join("") + (customHours > 0
+    ? '<div class="tariff-row"><span>Своя ставка</span><span>' + formatHoursMinutes(customHours) +
+      ' · <b class="money">' + formatMoney(customIncome) + "</b></span></div>" : "");
+}
+
+/* ===================== Окно ввода смены ===================== */
+const dayOverlay = document.getElementById("dayOverlay");
+const startInput = document.getElementById("startInput");
+const endInput = document.getElementById("endInput");
+const breakCheckbox = document.getElementById("breakCheckbox");
+const breakSelect = document.getElementById("breakSelect");
+const commentInput = document.getElementById("commentInput");
+const customRateInput = document.getElementById("customRateInput");
+
+function openDayEditor(key) {
+  selectedDateKey = key;
+  const date = parseDateKey(key);
+  const shift = storedShifts[key] || {};
+  document.getElementById("dayTitle").textContent =
+    date.toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" });
+  startInput.value = shift.start || "";
+  endInput.value = shift.end || "";
+  breakCheckbox.checked = !!shift.breakOn;
+  breakSelect.value = shift.breakMinutes || "30";
+  breakSelect.style.display = breakCheckbox.checked ? "block" : "none";
+  commentInput.value = shift.comment || "";
+  customRateInput.value = shift.customRate || "";
+  document.getElementById("deleteButton").style.display = storedShifts[key] ? "block" : "none";
+  updatePreview();
+  dayOverlay.classList.add("open");
+}
+
+function readShiftFromForm() {
+  return {
+    start: startInput.value, end: endInput.value,
+    breakOn: breakCheckbox.checked, breakMinutes: breakSelect.value,
+    comment: commentInput.value.trim(),
+    color: "", customRate: customRateInput.value.trim()
+  };
+}
+
+function updatePreview() {
+  const preview = document.getElementById("dayPreview");
+  const calculation = calculateShift(readShiftFromForm(), parseDateKey(selectedDateKey));
+  if (!calculation) { preview.innerHTML = ""; return; }
+  const rowStyle = "display:flex;justify-content:space-between;color:var(--text);font-weight:400;font-size:15px;padding:3px 0";
+  const lines = calculation.customHours > 0
+    ? '<div style="' + rowStyle + '"><span>Своя ставка (' + calculation.customRate + " р/ч)</span><span>" +
+      formatHoursMinutes(calculation.customHours) + " ч · " + formatMoney(calculation.earnings) + " р</span></div>"
+    : TARIFF_NAMES.map((name, i) =>
+        '<div style="' + rowStyle + '"><span>' + name + " (" + TARIFF_RATES[i] + " р/ч)</span><span>" +
+        formatHoursMinutes(calculation.hoursByTariff[i]) + " ч · " +
+        formatMoney(calculation.hoursByTariff[i] * TARIFF_RATES[i]) + " р</span></div>").join("");
+  preview.innerHTML = lines +
+    '<div style="margin-top:6px">Итого: ' + formatHoursMinutes(calculation.totalHours) + " ч · " +
+    formatMoney(calculation.earnings) + " р</div>";
+}
+
+[startInput, endInput, breakCheckbox, breakSelect, customRateInput].forEach(element =>
+  element.addEventListener("input", () => {
+    breakSelect.style.display = breakCheckbox.checked ? "block" : "none";
+    updatePreview();
+  }));
+
+document.getElementById("saveButton").addEventListener("click", () => {
+  if (!startInput.value || !endInput.value) { alert("Укажите время начала и конца смены."); return; }
+  storedShifts[selectedDateKey] = readShiftFromForm();
+  saveShifts(); dayOverlay.classList.remove("open"); render();
+});
+document.getElementById("deleteButton").addEventListener("click", () => {
+  delete storedShifts[selectedDateKey];
+  saveShifts(); dayOverlay.classList.remove("open"); render();
+});
+document.getElementById("cancelButton").addEventListener("click", () => dayOverlay.classList.remove("open"));
+
+/* ===================== Отчет ===================== */
+const reportOverlay = document.getElementById("reportOverlay");
+document.getElementById("reportButton").addEventListener("click", () => {
+  const items = collectShifts(visibleYear + "-" + pad(visibleMonth + 1));
+  document.getElementById("reportTitle").textContent = "Отчет: " + document.getElementById("monthTitle").textContent;
+  document.getElementById("reportBody").innerHTML = items.length ? items.map(item =>
+    '<div class="report-row"><div>' + pad(item.date.getDate()) + "." + pad(item.date.getMonth() + 1) +
+    " · " + item.shift.start + "–" + item.shift.end +
+    "<small>" + escapeHtml(item.shift.comment || "") + "</small></div><div style='text-align:right'>" +
+    formatHoursMinutes(item.calculation.totalHours) + '<small style="color:var(--green)">' +
+    formatMoney(item.calculation.earnings) + "</small></div></div>").join("")
+    : '<div class="empty-note">В этом месяце смен нет. Нажмите на день в календаре, чтобы добавить смену.</div>';
+  reportOverlay.classList.add("open");
+});
+document.getElementById("reportCloseButton").addEventListener("click", () => reportOverlay.classList.remove("open"));
+[dayOverlay, reportOverlay].forEach(overlay =>
+  overlay.addEventListener("click", event => { if (event.target === overlay) overlay.classList.remove("open"); }));
+
+function escapeHtml(text) {
+  return text.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+/* ===================== Экспорт в CSV ===================== */
+document.getElementById("exportButton").addEventListener("click", () => {
+  const items = collectShifts(visibleYear + "-" + pad(visibleMonth + 1));
+  if (!items.length) { alert("В этом месяце нет смен для экспорта."); return; }
+
+  const rows = [["Дата", "Рабочие часы", "Основной тариф", "Тариф 2", "Тариф 3", "Итого", "Место проведения", "Своя ставка"]];
+  const totals = [0, 0, 0, 0, 0];
+  items.forEach(item => {
+    const hours = item.calculation.hoursByTariff;
+    rows.push([
+      pad(item.date.getDate()) + "." + pad(item.date.getMonth() + 1),
+      item.shift.start + "-" + item.shift.end,
+      formatDecimalHours(hours[0]), formatDecimalHours(hours[1]), formatDecimalHours(hours[2]),
+      formatDecimalHours(item.calculation.totalHours),
+      item.shift.comment || "",
+      formatDecimalHours(item.calculation.customHours)
+    ]);
+    hours.forEach((value, i) => totals[i] += value);
+    totals[3] += item.calculation.totalHours;
+    totals[4] += item.calculation.customHours;
+  });
+  rows.push(["Итого", "", formatDecimalHours(totals[0]), formatDecimalHours(totals[1]), formatDecimalHours(totals[2]), formatDecimalHours(totals[3]), "", formatDecimalHours(totals[4])]);
+
+  // Экранируем ячейки: кавычки удваиваются, значения с ; или кавычками берутся в кавычки
+  const csvText = rows.map(row => row.map(cell => {
+    const text = String(cell);
+    return /[;"\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+  }).join(";")).join("\r\n");
+
+  const blob = new Blob(["\uFEFF" + csvText], { type: "text/csv;charset=utf-8" });
+  const fileName = "tabel_" + visibleYear + "-" + pad(visibleMonth + 1) + ".csv";
+
+  // Обычная загрузка файла (работает на компьютере и в большинстве браузеров)
+  function downloadFile() {
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = fileName;
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => { link.remove(); URL.revokeObjectURL(link.href); }, 4000);
+  }
+
+  // На телефонах (особенно в iPhone в режиме приложения) загрузка часто блокируется,
+  // поэтому сначала пробуем меню «Поделиться», а при ошибке скачиваем обычным способом
+  const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  try {
+    const file = new File([blob], fileName, { type: "text/csv" });
+    if (isMobileDevice && navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: fileName }).catch(error => {
+        if (error && error.name !== "AbortError") downloadFile();   // AbortError = пользователь закрыл меню
+      });
+      return;
+    }
+    downloadFile();
+  } catch (error) {
+    alert("Не удалось создать файл: " + error.message);
+  }
+});
+
+/* ===================== Навигация по месяцам ===================== */
+function shiftMonth(delta) {
+  visibleMonth += delta;
+  if (visibleMonth < 0) { visibleMonth = 11; visibleYear--; }
+  if (visibleMonth > 11) { visibleMonth = 0; visibleYear++; }
+  render();
+}
+document.getElementById("previousMonthButton").addEventListener("click", () => shiftMonth(-1));
+document.getElementById("nextMonthButton").addEventListener("click", () => shiftMonth(1));
+
+/* ===================== PWA: манифест и офлайн ===================== */
+(function setupProgressiveWebApp() {
+  // Манифест создается из кода, чтобы не требовать отдельного файла
+  const icon = "data:image/svg+xml," + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="110" fill="#121212"/>' +
+    '<rect x="96" y="120" width="320" height="300" rx="36" fill="#ff453a"/><rect x="96" y="120" width="320" height="80" rx="36" fill="#1e1e1e"/>' +
+    '<circle cx="256" cy="310" r="70" fill="none" stroke="#fff" stroke-width="22"/><path d="M256 270v44l30 20" stroke="#fff" stroke-width="20" fill="none" stroke-linecap="round"/></svg>');
+  const manifest = {
+    name: "Табель учета рабочего времени", short_name: "Табель", display: "standalone",
+    start_url: ".", background_color: "#121212", theme_color: "#121212",
+    icons: [{ src: icon, sizes: "512x512", type: "image/svg+xml", purpose: "any" }]
+  };
+  const link = document.createElement("link");
+  link.rel = "manifest";
+  link.href = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: "application/manifest+json" }));
+  document.head.appendChild(link);
+
+  // Service worker обязан лежать отдельным файлом sw.js рядом с index.html
+  if ("serviceWorker" in navigator && location.protocol.indexOf("http") === 0) {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
+})();
+
+render();
+</script>
+</body>
+</html>
